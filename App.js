@@ -4,6 +4,7 @@ import schedule from './schedule.json';
 import * as moment from 'moment';
 import {omit} from 'lodash';
 
+// Panels: #E91E63 pink, Fan Events #9C27B0 purple ,Social: #03A9F4 blue, Ops #fff white, Dealers #FF9800 orange, Gaming #8BC34A green, Screenings #FFEB3B yellow, Music #CDDC39 lime
 const trackMap = {
   '10050': {name: 'Panels 1', group: 'Panels'},
   '10060': {name: 'Panels 2', group: 'Panels'},
@@ -11,8 +12,8 @@ const trackMap = {
   '10080': {name: 'Panels 4', group: 'Panels'},
   '10090': {name: 'Fan Events 1', group: 'Fan Events'},
   '10091': {name: 'Fan Events 2', group: 'Fan Events'},
-  '10100': {name: 'Maid Cafe', group: 'Maid Cafe'},
-  '20010': {name: 'Dojo', group: 'Dojo'},
+  '10100': {name: 'Maid Cafe', group: 'Social'},
+  '20010': {name: 'Dojo', group: 'Social'},
   '20090': {name: 'New Mothers Room', group: 'Ops'},
   '20110': {name: 'Lost and Found', group: 'Ops'},
   '30010': {name: 'Volunteers', group: 'Ops'},
@@ -42,7 +43,7 @@ const trackMap = {
   '40320': {name: 'Info Desk 2', group: 'Ops'},
   '40321': {name: 'Info Desk 4', group: 'Ops'},
   '40322': {name: 'Info Desk 5', group: 'Ops'},
-  '40330': {name: 'Stage Zero', group: 'Misc'},
+  '40330': {name: 'Stage Zero', group: 'Panels'},
   '40350': {name: 'Swap Meet', group: 'Dealers'},
   '40360': {name: 'MusicFest', group: 'Music'},
   '40370': {name: 'Cosplay', group: 'Social'},
@@ -95,7 +96,16 @@ const mapRoomDataToEvents = () => schedule.map(room => {
 
   return room.children.map(event => Object.assign({}, event, {room: roomData, key: `${event.id}-${event.start}`}));
 })
-.reduce((prev, curr) => [...prev, ...curr], []);
+.reduce((prev, curr) => [...prev, ...curr], [])
+.sort((a, b) => {
+  const aStart = moment.unix(a.start);
+  const bStart = moment.unix(b.start);
+
+  if (aStart.isBefore(bStart)) return -1;
+  if (aStart.isAfter(bStart)) return 1;
+
+  return 0;
+});
 
 const groupByDays = (eventList) => {
   const result = {}
@@ -114,8 +124,10 @@ const groupByDays = (eventList) => {
 }
 
 const EventItem = ({event}) => {
+  const eventTrack = trackMap[event.trackid] || {};
+
   return (
-    <View style={styles.eventItem}>
+    <View style={[styles.eventItem, {borderLeftColor: colorCodes[eventTrack.group], borderLeftWidth: 8}]}>
       <Text style={[styles.eventItemText, styles.uBold, styles.uTitle]}>{event.name}</Text>
       <Text style={styles.eventItemText}>{event.room.name}</Text>
       <Text style={styles.eventItemText}>{event.room.room_venue} - {event.room.room_name}</Text>
@@ -125,14 +137,22 @@ const EventItem = ({event}) => {
 }
 
 export default class App extends React.Component {
+  constructor(...args) {
+    super(...args);
+
+    this.state = {
+      tab: 'schedule'
+    }
+  }
   render() {
     const sectionHeader = ({section}) => (<Text style={styles.sectionHeader}>{section.title}</Text>)
     return (
       <View style={styles.container}>
         <View style={styles.topBar}>
-          <Text style={{fontSize: 32, color: 'white', textAlign: 'center'}}>Con Squad</Text>
+          <Text style={{fontSize: 32, color: 'white', textAlign: 'center'}}>Fanime Schedule</Text>
         </View>
         <SectionList renderSectionHeader={sectionHeader} sections={groupByDays(mapRoomDataToEvents())} renderItem={({item}) => <EventItem event={item}/>} />
+
       </View>
     );
   }
@@ -182,3 +202,15 @@ const styles = StyleSheet.create({
     marginBottom: 8
   }
 });
+
+// Panels: #E91E63 pink, Fan Events #9C27B0 purple ,Social: #03A9F4 blue, Ops #fff white, Dealers #FF9800 orange, Gaming #8BC34A green, Screenings #FFEB3B yellow, Music #CDDC39 lime
+const colorCodes = {
+  'Panels': '#E91E63', // pink
+  'Fan Events': '#9C27B0', // purple
+  'Social': '#03A9F4', // blue
+  'Ops': '#607D8B', // bluegrey
+  'Dealers': '#FF9800', // orange
+  'Gaming': '#8BC34A', // green
+  'Screenings': '#FFEB3B', // yellow
+  'Music': '#CDDC39' // lime
+}
