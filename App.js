@@ -1,8 +1,13 @@
 import React from 'react';
-import { StyleSheet, Text, View, FlatList, SectionList } from 'react-native';
+import { StyleSheet, Text, View, FlatList, SectionList, ScrollView } from 'react-native';
 import schedule from './schedule.json';
 import * as moment from 'moment';
-import {omit} from 'lodash';
+import {omit, groupBy} from 'lodash';
+import {
+  createBottomTabNavigator,
+  createStackNavigator,
+} from 'react-navigation';
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
 
 // Panels: #E91E63 pink, Fan Events #9C27B0 purple ,Social: #03A9F4 blue, Ops #fff white, Dealers #FF9800 orange, Gaming #8BC34A green, Screenings #FFEB3B yellow, Music #CDDC39 lime
 const trackMap = {
@@ -89,23 +94,144 @@ const trackMap = {
   '67749': {name: 'PC Tournaments', group: 'Gaming'},
   '67751': {name: 'Console Tournaments', group: 'Gaming'},
   '68479': {name: 'Arcade Tournaments', group: 'Gaming'}
+};
+
+
+const SettingsManager = {
+  subscribers: [],
+
+  settings: {
+    filter: {
+      '10050': true,
+      '10060': true,
+      '10070': true,
+      '10080': true,
+      '10090': true,
+      '10091': true,
+      '10100': true,
+      '20010': true,
+      '20090': true,
+      '20110': true,
+      '30010': true,
+      '30030': true,
+      '30060': true,
+      '40010': true,
+      '40060': true,
+      '40070': true,
+      '40080': true,
+      '40090': true,
+      '40100': true,
+      '40110': true,
+      '40120': true,
+      '40130': true,
+      '40140': true,
+      '40170': true,
+      '40180': true,
+      '40190': true,
+      '40200': true,
+      '40210': true,
+      '40220': true,
+      '40230': true,
+      '40240': true,
+      '40250': true,
+      '40300': true,
+      '40310': true,
+      '40320': true,
+      '40321': true,
+      '40322': true,
+      '40330': true,
+      '40350': true,
+      '40360': true,
+      '40370': true,
+      '40380': true,
+      '61139': true,
+      '61145': true,
+      '61241': true,
+      '61242': true,
+      '62702': true,
+      '62703': true,
+      '62704': true,
+      '62706': true,
+      '62707': true,
+      '62708': true,
+      '62709': true,
+      '62710': true,
+      '62711': true,
+      '62808': true,
+      '62810': true,
+      '62812': true,
+      '62819': true,
+      '62822': true,
+      '64958': true,
+      '64961': true,
+      '64965': true,
+      '64966': true,
+      '67002': true,
+      '67004': true,
+      '67008': true,
+      '67010': true,
+      '67012': true,
+      '67014': true,
+      '67016': true,
+      '67021': true,
+      '67033': true,
+      '67057': true,
+      '67060': true,
+      '67063': true,
+      '67079': true,
+      '67106': true,
+      '67697': true,
+      '67698': true,
+      '67749': true,
+      '67751': true,
+      '68479': true
+    }
+  },
+
+  subscribe(listener) {
+    const id = (new Date()).getTime();
+    SettingsManager.subscribers.push({id, fn: listener});
+
+    return SettingsManager.unsubscribe.bind(id);
+  },
+
+  unsubscribe(id) {
+    SettingsManager.subscribers = SettingsManager.subscribers.filter(listener => lister.id !== id);
+  },
+
+  update(area, prop, val) {
+    const updated = Object.assign({}, SettingsManager.settings);
+
+    updated[area][prop] = val;
+
+    return AsyncStorage.setItem('@consquad_settings', JSON.stringify(updated))
+      .then(() => {
+        SettingsManager.settings = updated;
+        SettingsManager.subscribers.forEach(config => {
+          config.fn(updated);
+        })
+      });
+  }
 }
 
-const mapRoomDataToEvents = () => schedule.map(room => {
-  const roomData = omit(room, 'children');
+const mapRoomDataToEvents = () => {
+  const reduced = schedule.map(room => {
+    const roomData = omit(room, 'children');
 
-  return room.children.map(event => Object.assign({}, event, {room: roomData, key: `${event.id}-${event.start}`}));
-})
-.reduce((prev, curr) => [...prev, ...curr], [])
-.sort((a, b) => {
-  const aStart = moment.unix(a.start);
-  const bStart = moment.unix(b.start);
+    return room.children.map(event => Object.assign({}, event, {room: roomData, key: `${event.id}-${event.start}`}));
+  })
+  .reduce((prev, curr) => [...prev, ...curr], [])
 
-  if (aStart.isBefore(bStart)) return -1;
-  if (aStart.isAfter(bStart)) return 1;
+  return reduced.sort((a, b) => {
+    const aStart = moment.unix(a.start);
+    const bStart = moment.unix(b.start);
 
-  return 0;
-});
+    if (aStart.isBefore(bStart)) return -1;
+    if (aStart.isAfter(bStart)) return 1;
+
+    return 0;
+  });
+}
 
 const groupByDays = (eventList) => {
   const result = {}
@@ -128,7 +254,10 @@ const EventItem = ({event}) => {
 
   return (
     <View style={[styles.eventItem, {borderLeftColor: colorCodes[eventTrack.group], borderLeftWidth: 8}]}>
-      <Text style={[styles.eventItemText, styles.uBold, styles.uTitle]}>{event.name}</Text>
+      <Text style={[styles.eventItemText, styles.uBold, styles.uTitle]}>
+        {event.name} -
+        <Text style={{color: colorCodes[eventTrack.group]}}> {eventTrack.group}</Text>
+      </Text>
       <Text style={styles.eventItemText}>{event.room.name}</Text>
       <Text style={styles.eventItemText}>{event.room.room_venue} - {event.room.room_name}</Text>
       <Text style={styles.eventItemText}>{moment.unix(event.start).format('lll')} - {moment.unix(event.end).format('lll')}</Text>
@@ -136,27 +265,101 @@ const EventItem = ({event}) => {
   )
 }
 
-export default class App extends React.Component {
+const FullSchedule = () => {
+  const sectionHeader = ({section}) => (<Text style={styles.sectionHeader}>{section.title}</Text>);
+
+  return (
+    <SectionList renderSectionHeader={sectionHeader} sections={groupByDays(mapRoomDataToEvents())} renderItem={({item}) => <EventItem event={item}/>} />
+  );
+}
+
+class FilterMenu extends React.Component {
   constructor(...args) {
     super(...args);
 
-    this.state = {
-      tab: 'schedule'
-    }
+    this.state = Object.assign({}, SettingsManager.settings.filters);
+    this.unsubscribe = SettingsManager.subscribe((settings) => {
+      this.setState(prev => settings.filter);
+    });
   }
+
+  updateFilter(key, val) {
+    SettingsManager.update('filter', key, val);
+  }
+
+  getData() {
+    return groupBy(trackMap, 'group');
+  }
+
+
+  getFilterItems(items) {
+    const filterItem = (item, i) => (
+      <View  key={`${item.name}-${i}`}>
+        <Text>
+          <Text><MaterialIcon name={''} size={24} color={'blue'} /></Text>
+          <Text>{item.name}</Text>
+        </Text>
+      </View>
+    )
+
+    return items.map(filterItem);
+  }
+
+  makeFilterGroups() {
+    const groups = this.getData();
+
+    return Object.keys(groups).map(name => (
+      <View key={name}>
+        <Text style={styles.sectionHeader}>{name}</Text>
+        {this.getFilterItems(groups[name])}
+      </View>
+    ))
+  }
+
   render() {
-    const sectionHeader = ({section}) => (<Text style={styles.sectionHeader}>{section.title}</Text>)
+    return (
+      <ScrollView style={styles.container}>
+        {this.makeFilterGroups()}
+      </ScrollView>
+    )
+  }
+}
+
+const RootStack = createBottomTabNavigator({
+  schedule: {screen: FullSchedule},
+  filters: {screen: FilterMenu}
+}, {
+  initialRouteName: 'schedule',
+  tabBarOptions: {
+    showLabel: false
+  },
+  navigationOptions: ({ navigation }) => ({
+    tabBarIcon: ({ focused, tintColor }) => {
+      const { routeName } = navigation.state;
+      const iconMap = {
+        schedule: 'event',
+        filters: 'filter-list'
+      }
+
+      return <MaterialIcon name={iconMap[routeName]} size={24} color={tintColor} />;
+    },
+  })
+});
+
+export default class App extends React.Component {
+  render() {
     return (
       <View style={styles.container}>
         <View style={styles.topBar}>
           <Text style={{fontSize: 32, color: 'white', textAlign: 'center'}}>Fanime Schedule</Text>
         </View>
-        <SectionList renderSectionHeader={sectionHeader} sections={groupByDays(mapRoomDataToEvents())} renderItem={({item}) => <EventItem event={item}/>} />
-
+        <RootStack />
       </View>
     );
   }
 }
+
+
 
 const styles = StyleSheet.create({
   container: {
